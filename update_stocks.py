@@ -30,7 +30,6 @@ COL_WEIGHT = "비중"
 COL_RETURN = "수익률"
 COL_PNL = "손익"
 COL_STATUS = "상태"
-COL_SELECT = "종목"
 COL_UPDATED = "갱신시각"
 
 # 자산기록 DB 컬럼
@@ -101,9 +100,8 @@ def fetch_rows(database_id, **kwargs):
         cursor = resp["next_cursor"]
     return results
 
-def update_holding(page_id, name, ccy, price, change_pct, value, weight, ret, pnl, status, now_str):
+def update_holding(page_id, ccy, price, change_pct, value, weight, ret, pnl, status, now_str):
     notion.pages.update(page_id=page_id, properties={
-        COL_SELECT: {"select": {"name": name}},
         COL_CCY: {"select": {"name": ccy}},
         COL_PRICE: {"number": round(price, 2)},
         COL_CHANGE: {"number": round(change_pct / 100, 4)},
@@ -194,7 +192,7 @@ def main():
     # 2단계: 전체 합계가 나왔으니 비중을 구해 노션에 기록
     for h in holdings:
         weight = (h["value_krw"] / total_value * 100) if total_value else 0.0
-        update_holding(h["id"], h["name"], "KRW", h["price_krw"], h["change_pct"],
+        update_holding(h["id"], "KRW", h["price_krw"], h["change_pct"],
                        h["value_krw"], weight, h["ret"], h["pnl_krw"], h["status"], now_str)
         print(f"[완료] {h['name']} ({h['code']}): {h['price_krw']:,.0f}원 | "
               f"{h['ret']:+.2f}% | 비중 {weight:.1f}% | 전일 {h['change_pct']:+.2f}%")
