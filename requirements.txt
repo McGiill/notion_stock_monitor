@@ -1,0 +1,4 @@
+notion-client==2.2.1
+finance-datareader>=0.9.50
+yfinance>=0.2.40
+python-dotenv>=1.0.1

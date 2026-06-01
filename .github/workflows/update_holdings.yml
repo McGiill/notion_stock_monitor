@@ -1,0 +1,29 @@
+name: Update Holdings
+
+on:
+  schedule:
+    - cron: "0 0 * * 1-5"   # 오전 9시 KST (0:00 UTC), 평일
+    - cron: "0 7 * * 1-5"   # 오후 4시 KST (7:00 UTC), 평일
+  workflow_dispatch: {}      # Actions 탭에서 수동 실행 버튼
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run updater
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_HISTORY_DATABASE_ID: ${{ secrets.NOTION_HISTORY_DATABASE_ID }}
+        run: python update_stocks.py
