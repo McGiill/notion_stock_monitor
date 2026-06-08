@@ -13,6 +13,7 @@ load_dotenv()
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
 HISTORY_DATABASE_ID = os.environ["NOTION_HISTORY_DATABASE_ID"]
+PRICE_DATABASE_ID = os.environ.get("NOTION_PRICE_DATABASE_ID")  # 선택 (없으면 가격기록 생략)
 
 notion = Client(auth=NOTION_TOKEN)
 KST = ZoneInfo("Asia/Seoul")
@@ -39,6 +40,13 @@ H_TOTAL_VALUE = "총평가금액"
 H_TOTAL_COST = "총매입금액"
 H_TOTAL_PNL = "총손익"
 H_TOTAL_RETURN = "총수익률"
+
+# 가격기록 DB 컬럼 (종목별 가격 추이)
+P_TITLE = "기록"
+P_DATE = "일자"
+P_STOCK = "종목"
+P_PRICE = "현재가"
+P_VALUE = "평가금액"
 
 RETRY = 3  # 가격/환율 조회 재시도 횟수
 
@@ -134,6 +142,29 @@ def upsert_history(today, total_value, total_cost, total_pnl, total_return):
             properties={H_TITLE: {"title": [{"text": {"content": today}}]}, **props},
         )
 
+def upsert_price(today, name, price, value):
+    """가격기록 DB에 (오늘 날짜 + 종목) 한 행. 같은 날 같은 종목이면 갱신."""
+    props = {
+        P_DATE: {"date": {"start": today}},
+        P_STOCK: {"select": {"name": name}},
+        P_PRICE: {"number": round(price)},
+        P_VALUE: {"number": round(value)},
+    }
+    existing = fetch_rows(
+        PRICE_DATABASE_ID,
+        filter={"and": [
+            {"property": P_DATE, "date": {"equals": today}},
+            {"property": P_STOCK, "select": {"equals": name}},
+        ]},
+    )
+    if existing:
+        notion.pages.update(page_id=existing[0]["id"], properties=props)
+    else:
+        notion.pages.create(
+            parent={"database_id": PRICE_DATABASE_ID},
+            properties={P_TITLE: {"title": [{"text": {"content": f"{today} {name}"}}]}, **props},
+        )
+
 def main():
     now = datetime.now(KST)
     now_str = now.strftime("%Y-%m-%d %H:%M")
@@ -194,6 +225,8 @@ def main():
         weight = (h["value_krw"] / total_value * 100) if total_value else 0.0
         update_holding(h["id"], "KRW", h["price_krw"], h["change_pct"],
                        h["value_krw"], weight, h["ret"], h["pnl_krw"], h["status"], now_str)
+        if PRICE_DATABASE_ID:
+            upsert_price(today, h["name"], h["price_krw"], h["value_krw"])
         print(f"[완료] {h['name']} ({h['code']}): {h['price_krw']:,.0f}원 | "
               f"{h['ret']:+.2f}% | 비중 {weight:.1f}% | 전일 {h['change_pct']:+.2f}%")
         time.sleep(0.4)
