@@ -5,7 +5,8 @@
       "WebSearch",
       "Bash(python3 -m py_compile /Users/sangwoo/Desktop/notion/update_stocks.py)",
       "Bash(gh --version)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(git config *)"
     ]
   }
 }

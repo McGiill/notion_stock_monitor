@@ -150,15 +150,20 @@ def upsert_price(today, name, price, value):
         P_PRICE: {"number": round(price)},
         P_VALUE: {"number": round(value)},
     }
-    existing = fetch_rows(
+    # 날짜로만 필터 (Select는 없는 옵션으로 필터하면 400 에러 → 종목 매칭은 파이썬에서)
+    today_rows = fetch_rows(
         PRICE_DATABASE_ID,
-        filter={"and": [
-            {"property": P_DATE, "date": {"equals": today}},
-            {"property": P_STOCK, "select": {"equals": name}},
-        ]},
+        filter={"property": P_DATE, "date": {"equals": today}},
     )
-    if existing:
-        notion.pages.update(page_id=existing[0]["id"], properties=props)
+    match = None
+    for row in today_rows:
+        sel = row["properties"].get(P_STOCK, {}).get("select")
+        if sel and sel.get("name") == name:
+            match = row
+            break
+
+    if match:
+        notion.pages.update(page_id=match["id"], properties=props)
     else:
         notion.pages.create(
             parent={"database_id": PRICE_DATABASE_ID},
