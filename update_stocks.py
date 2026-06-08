@@ -1,6 +1,8 @@
 import argparse
+import json
 import os
 import time
+import urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -14,6 +16,7 @@ NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 DATABASE_ID = os.environ["NOTION_DATABASE_ID"]
 HISTORY_DATABASE_ID = os.environ["NOTION_HISTORY_DATABASE_ID"]
 PRICE_DATABASE_ID = os.environ.get("NOTION_PRICE_DATABASE_ID")  # 선택 (없으면 가격기록 생략)
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")     # 선택 (없으면 알림 생략)
 
 notion = Client(auth=NOTION_TOKEN)
 KST = ZoneInfo("Asia/Seoul")
@@ -170,6 +173,22 @@ def upsert_price(today, name, price, value):
             properties={P_TITLE: {"title": [{"text": {"content": f"{today} {name}"}}]}, **props},
         )
 
+def send_discord(message):
+    """디스코드 웹훅으로 메시지 전송."""
+    if not DISCORD_WEBHOOK_URL:
+        print("디스코드 웹훅 미설정 — 알림 생략")
+        return
+    data = json.dumps({"content": message}).encode("utf-8")
+    req = urllib.request.Request(
+        DISCORD_WEBHOOK_URL, data=data,
+        headers={"Content-Type": "application/json", "User-Agent": "notion-stock-monitor"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        print("디스코드 알림 전송 완료.")
+    except Exception as e:
+        print(f"  ! 디스코드 전송 실패: {e}")
+
 def main():
     now = datetime.now(KST)
     now_str = now.strftime("%Y-%m-%d %H:%M")
@@ -247,8 +266,22 @@ def main():
     else:
         print("자산기록 생략 (월 1회 history 워크플로에서만 기록)")
 
+    if args.notify and holdings:
+        top = max(holdings, key=lambda h: h["change_pct"])      # 전일 대비 최고 상승
+        bottom = min(holdings, key=lambda h: h["change_pct"])   # 전일 대비 최고 하락
+        msg = (
+            f"📊 **장마감 포트폴리오** ({now_str})\n"
+            f"💱 환율(USD/KRW): {fx:,.2f}원\n"
+            f"💰 총 평가금액: {total_value:,.0f}원 ({total_return:+.2f}%)\n"
+            f"💵 총 손익: {total_pnl:+,.0f}원\n"
+            f"📈 최고 상승: {top['name']} ({top['change_pct']:+.2f}%)\n"
+            f"📉 최고 하락: {bottom['name']} ({bottom['change_pct']:+.2f}%)"
+        )
+        send_discord(msg)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--history", action="store_true", help="자산기록 DB에 오늘 총자산 기록")
+    parser.add_argument("--notify", action="store_true", help="디스코드로 장마감 요약 전송")
     args = parser.parse_args()
     main()

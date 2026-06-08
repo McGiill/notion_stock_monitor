@@ -1,8 +1,8 @@
-name: Update Holdings
+name: Market Close (Notify)
 
 on:
   schedule:
-    - cron: "0 0 * * 1-5"   # 오전 9시 KST (0:00 UTC), 평일
+    - cron: "0 7 * * 1-5"   # 오후 4시 KST (7:00 UTC), 평일 장마감 후
   workflow_dispatch: {}      # Actions 탭에서 수동 실행 버튼
 
 env:
@@ -23,10 +23,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run updater
+      - name: Run updater with Discord notify
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           NOTION_HISTORY_DATABASE_ID: ${{ secrets.NOTION_HISTORY_DATABASE_ID }}
           NOTION_PRICE_DATABASE_ID: ${{ secrets.NOTION_PRICE_DATABASE_ID }}
-        run: python update_stocks.py
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python update_stocks.py --notify
